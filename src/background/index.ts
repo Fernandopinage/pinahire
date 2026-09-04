@@ -1,6 +1,7 @@
-import { Job, UserProfile, UserPreferences, JobMatchResult } from "../types";
+import { Job, UserProfile, UserPreferences, JobMatchResult, ProfileScore } from "../types";
 import { parseJobDescription } from "../parser";
 import { analyzeJob } from "../analyzer";
+import { calculateProfileScore } from "../analyzer/profile-score";
 import { storage } from "../storage";
 
 interface Message {
@@ -108,6 +109,15 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    if (message.type === "GET_PROFILE_SCORE") {
+      handleGetProfileScore()
+        .then((score) => sendResponse({ success: true, data: score }))
+        .catch((error) =>
+          sendResponse({ success: false, error: error.message })
+        );
+      return true;
+    }
+
     return false;
   }
 );
@@ -141,4 +151,12 @@ async function handleAnalyzeText(
 ): Promise<JobMatchResult> {
   const job = parseJobDescription(text, title, company, url);
   return handleAnalyzeJob(job);
+}
+
+async function handleGetProfileScore(): Promise<ProfileScore> {
+  const profile = await storage.getProfile();
+  if (!profile) {
+    throw new Error("Perfil não cadastrado.");
+  }
+  return calculateProfileScore(profile);
 }

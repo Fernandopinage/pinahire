@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { JobMatchResult, HistoryItem, DashboardStats } from "../types";
+import { JobMatchResult, HistoryItem, DashboardStats, ProfileScore } from "../types";
 
-type Tab = "analyze" | "history" | "dashboard";
+type Tab = "analyze" | "profile" | "history" | "dashboard";
 
 export function Popup() {
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
@@ -13,12 +13,16 @@ export function Popup() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [profileScore, setProfileScore] = useState<ProfileScore | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     if (activeTab === "history") {
       loadHistory();
     } else if (activeTab === "dashboard") {
       loadStats();
+    } else if (activeTab === "profile") {
+      loadProfileScore();
     }
   }, [activeTab]);
 
@@ -35,6 +39,22 @@ export function Popup() {
     });
     if (response?.data) {
       setStats(response.data);
+    }
+  }
+
+  async function loadProfileScore() {
+    setProfileLoading(true);
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "GET_PROFILE_SCORE",
+      });
+      if (response?.success) {
+        setProfileScore(response.data);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar score do perfil");
+    } finally {
+      setProfileLoading(false);
     }
   }
 
@@ -141,6 +161,19 @@ export function Popup() {
     }
   }
 
+  function getLevelColor(level: string): string {
+    switch (level) {
+      case "diamante":
+        return "#a855f7";
+      case "ouro":
+        return "#eab308";
+      case "prata":
+        return "#94a3b8";
+      default:
+        return "#cd7f32";
+    }
+  }
+
   return (
     <div className="container">
       <div className="header">
@@ -155,19 +188,25 @@ export function Popup() {
           className={`tab ${activeTab === "analyze" ? "active" : ""}`}
           onClick={() => setActiveTab("analyze")}
         >
-          Analisar
+          🎯 Analisar
+        </button>
+        <button
+          className={`tab ${activeTab === "profile" ? "active" : ""}`}
+          onClick={() => setActiveTab("profile")}
+        >
+          👤 Meu Score
         </button>
         <button
           className={`tab ${activeTab === "history" ? "active" : ""}`}
           onClick={() => setActiveTab("history")}
         >
-          Histórico
+          📋 Histórico
         </button>
         <button
           className={`tab ${activeTab === "dashboard" ? "active" : ""}`}
           onClick={() => setActiveTab("dashboard")}
         >
-          Dashboard
+          📊 Stats
         </button>
       </div>
 
@@ -382,6 +421,141 @@ export function Popup() {
           {loading && (
             <div className="loading">
               <div className="spinner" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "profile" && (
+        <div>
+          {profileLoading ? (
+            <div className="loading">
+              <div className="spinner" />
+            </div>
+          ) : profileScore ? (
+            <>
+              <div className="score-container">
+                <div
+                  className="score-value"
+                  style={{ color: getLevelColor(profileScore.level) }}
+                >
+                  {profileScore.overall}%
+                </div>
+                <div className="score-label">Score do Perfil</div>
+                <div
+                  className="classification"
+                  style={{
+                    background: `${getLevelColor(profileScore.level)}22`,
+                    color: getLevelColor(profileScore.level),
+                  }}
+                >
+                  {profileScore.levelLabel}
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-title">📈 Progresso</div>
+                <div className="section">
+                  <div className="flex justify-between text-xs mb-2">
+                    <span>Próximo nível: {profileScore.nextLevel}</span>
+                    <span>{profileScore.pointsToNext} pts restantes</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill excellent"
+                      style={{
+                        width: `${profileScore.overall}%`,
+                        background: getLevelColor(profileScore.level),
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-title">📊 Detalhes</div>
+                <div className="explanation-grid">
+                  <div className="explanation-item">
+                    <div className="explanation-value">
+                      {profileScore.skillsCount}
+                    </div>
+                    <div className="explanation-label">Skills</div>
+                  </div>
+                  <div className="explanation-item">
+                    <div className="explanation-value">
+                      {profileScore.experienceYears} anos
+                    </div>
+                    <div className="explanation-label">Experiência</div>
+                  </div>
+                  <div className="explanation-item">
+                    <div className="explanation-value">
+                      {profileScore.completeness}%
+                    </div>
+                    <div className="explanation-label">Completude</div>
+                  </div>
+                  <div className="explanation-item">
+                    <div className="explanation-value">
+                      {profileScore.seniorityLevel === "junior"
+                        ? "Júnior"
+                        : profileScore.seniorityLevel === "pleno"
+                        ? "Pleno"
+                        : profileScore.seniorityLevel === "senior"
+                        ? "Sênior"
+                        : "Especialista"}
+                    </div>
+                    <div className="explanation-label">Nível</div>
+                  </div>
+                </div>
+              </div>
+
+              {profileScore.strengths.length > 0 && (
+                <div className="card">
+                  <div className="card-title">💪 Pontos Fortes</div>
+                  <div className="skill-list">
+                    {profileScore.strengths.map((strength, index) => (
+                      <div key={index} className="skill-item match">
+                        <span className="skill-icon">✅</span>
+                        <span>{strength}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {profileScore.weaknesses.length > 0 && (
+                <div className="card">
+                  <div className="card-title">⚠️ Melhorias Sugeridas</div>
+                  <div className="skill-list">
+                    {profileScore.weaknesses.map((weakness, index) => (
+                      <div key={index} className="skill-item partial">
+                        <span className="skill-icon">💡</span>
+                        <span>{weakness}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="card">
+                <div className="card-title">💬 Recomendação</div>
+                <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  {profileScore.recommendation}
+                </div>
+              </div>
+
+              <button
+                className="button button-secondary mt-3"
+                onClick={loadProfileScore}
+              >
+                🔄 Atualizar Score
+              </button>
+            </>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">👤</div>
+              <div className="empty-state-text">
+                Cadastre seu perfil primeiro nas configurações.
+              </div>
             </div>
           )}
         </div>

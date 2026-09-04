@@ -109,3 +109,19 @@ export interface DashboardStats {
   above80: number;
   above90: number;
 }
+
+export interface ProfileScore {
+  overall: number;
+  skillsCount: number;
+  skillsWithLevel: number;
+  experienceYears: number;
+  seniorityLevel: SkillLevel;
+  completeness: number;
+  strengths: string[];
+  weaknesses: string[];
+  recommendation: string;
+  level: "bronze" | "prata" | "ouro" | "diamante";
+  levelLabel: string;
+  nextLevel: string;
+  pointsToNext: number;
+}
