@@ -29,12 +29,19 @@ export function calculateProfileScore(profile: UserProfile): ProfileScore {
   const seniorityScore = calculateSeniorityScore(profile);
   const completenessScore = calculateCompletenessScore(profile);
 
-  const overall = Math.round(
-    skillsScore * 0.4 +
-      experienceScore * 0.25 +
-      seniorityScore * 0.2 +
-      completenessScore * 0.15
-  );
+  // Fórmula ajustada para ser mais justa
+  let overall: number;
+
+  if (skillsCount === 0) {
+    overall = 5; // Mínimo se não tem skills
+  } else {
+    overall = Math.round(
+      skillsScore * 0.5 +          // 50% das skills
+      experienceScore * 0.2 +      // 20% experiência
+      seniorityScore * 0.15 +      // 15% senioridade
+      completenessScore * 0.15     // 15% completude
+    );
+  }
 
   const { level, levelLabel, nextLevel, pointsToNext } = getLevel(overall);
   const strengths = identifyStrengths(profile);
@@ -61,12 +68,24 @@ export function calculateProfileScore(profile: UserProfile): ProfileScore {
 function calculateSkillsScore(profile: UserProfile): number {
   if (profile.skills.length === 0) return 0;
 
+  // Pontuação baseada na quantidade de skills
+  let quantityScore = 0;
+  if (profile.skills.length >= 15) quantityScore = 100;
+  else if (profile.skills.length >= 10) quantityScore = 85;
+  else if (profile.skills.length >= 7) quantityScore = 70;
+  else if (profile.skills.length >= 5) quantityScore = 55;
+  else if (profile.skills.length >= 3) quantityScore = 35;
+  else quantityScore = 20;
+
+  // Pontuação baseada no nível das skills
   const totalPoints = profile.skills.reduce((sum, skill) => {
     return sum + SKILL_LEVEL_POINTS[skill.level];
   }, 0);
-
   const maxPoints = profile.skills.length * 80;
-  return (totalPoints / maxPoints) * 100;
+  const levelScore = (totalPoints / maxPoints) * 100;
+
+  // Média ponderada: 60% quantidade, 40% nível
+  return Math.round(quantityScore * 0.6 + levelScore * 0.4);
 }
 
 function calculateExperienceScore(profile: UserProfile): number {
@@ -186,28 +205,37 @@ function identifyStrengths(profile: UserProfile): string[] {
 function identifyWeaknesses(profile: UserProfile): string[] {
   const weaknesses: string[] = [];
 
-  if (profile.skills.length < 5) {
-    weaknesses.push("Poucas skills cadastradas (mínimo 5 recomendado)");
+  if (profile.skills.length < 3) {
+    weaknesses.push("Adicione pelo menos 5 skills ao seu perfil");
+  } else if (profile.skills.length < 5) {
+    weaknesses.push("Adicione mais skills para aumentar seu score");
   }
 
   const hasJuniorSkills = profile.skills.some((s) => s.level === "junior");
-  if (hasJuniorSkills && profile.skills.length > 0) {
-    weaknesses.push("Algumas skills em nível júnior");
+  const hasSeniorSkills = profile.skills.some(
+    (s) => s.level === "senior" || s.level === "especialista"
+  );
+  if (hasJuniorSkills && !hasSeniorSkills && profile.skills.length > 0) {
+    weaknesses.push("Evolua suas skills para níveis mais altos");
   }
 
   if (!profile.location) {
-    weaknesses.push("Localização não informada");
+    weaknesses.push("Informe sua localização");
   }
 
   if (
     !profile.preferredModality ||
     profile.preferredModality.length === 0
   ) {
-    weaknesses.push("Preferência de trabalho não definida");
+    weaknesses.push("Defina suas preferências de trabalho");
   }
 
   if (profile.yearsOfExperience === "0-1") {
-    weaknesses.push("Experiência ainda limitada");
+    weaknesses.push("Sua experiência é limitada - foque em projetos pessoais");
+  }
+
+  if (!profile.jobTitle || profile.jobTitle.length < 3) {
+    weaknesses.push("Informe seu cargo atual");
   }
 
   return weaknesses;

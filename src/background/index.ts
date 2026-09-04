@@ -118,6 +118,15 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    if (message.type === "IMPORT_LINKEDIN_PROFILE") {
+      handleImportLinkedInProfile()
+        .then((success) => sendResponse({ success: true, data: success }))
+        .catch((error) =>
+          sendResponse({ success: false, error: error.message })
+        );
+      return true;
+    }
+
     return false;
   }
 );
@@ -159,4 +168,33 @@ async function handleGetProfileScore(): Promise<ProfileScore> {
     throw new Error("Perfil não cadastrado.");
   }
   return calculateProfileScore(profile);
+}
+
+async function handleImportLinkedInProfile(): Promise<boolean> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return false;
+
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "SCRAPE_PROFILE",
+    });
+
+    if (response?.skills && response.skills.length > 0) {
+      const profile: UserProfile = {
+        jobTitle: response.jobTitle || "Profissional",
+        yearsOfExperience: response.yearsOfExperience || "3-5",
+        skills: response.skills,
+        location: response.location || "",
+        preferredModality: ["remoto", "hibrido"],
+        minimumLevel: response.minimumLevel || "pleno",
+      };
+
+      await storage.setProfile(profile);
+      return true;
+    }
+  } catch (err) {
+    console.error("Erro ao importar perfil:", err);
+  }
+
+  return false;
 }
